@@ -1,0 +1,10 @@
+sudo apt-get install -y pkg-config
+sudo apt-get install libasound-dev
+cd /usr/src
+sudo wget http://files.portaudio.com/archives/pa_stable_v190700_20210406.tgz
+sudo tar xvfz pa_stable_v190700_20210406.tgz
+cd portaudio
+sudo ./configure
+# Does ALSA say 'yes' in Configuration summary?
+sudo make
+# Now we can go get the portaudio go module
