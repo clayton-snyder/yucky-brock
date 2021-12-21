@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"math/rand"
+    "math"
 	"syscall"
 	"time"
 
@@ -24,6 +25,27 @@ func init() {
 	flag.Parse()
 
 	fmt.Printf("Flags: DiscordToken=%v, GreetingMsg=%v\n", DiscordToken, GreetingMsg)
+}
+
+type stereoSine struct {
+    *portaudio.Stream
+    stepL, phaseL float64
+    stepR, phaseR float64
+}
+
+func newStereoSine(freqL, freqR, sampleRate float64) *stereoSine {
+    s := &stereoSine{nil, freqL / sampleRate, 0, freqR / sampleRate, 0}
+    s.Stream, _ = portaudio.OpenDefaultStream(0, 2, 44100, 0, s.processAudio)
+    return s
+}
+
+func (g *stereoSine) processAudio(out [][]float32) {
+    for i := range out[0] {
+        out[0][i] = float32(math.Sin(2 * math.Pi * g.phaseL))
+        _, g.phaseL = math.Modf(g.phaseL + g.stepL)
+        out[1][i] = float32(math.Sin(2 * math.Pi * g.phaseR))
+        _, g.phaseR = math.Modf(g.phaseR + g.stepR)
+    }
 }
 
 func main() {
@@ -64,6 +86,12 @@ func main() {
 	    fmt.Printf("Error with portaudio.DefaultHostApi(): '%v'\n", err)
 	    return
 	}
+
+    s := newStereoSine(256, 320, 44100)
+    defer s.Close()
+    s.Start()
+    time.Sleep (5 * time.Second)
+    s.Stop()
 
 	stream, err := portaudio.OpenStream(portaudio.HighLatencyParameters(nil, h.DefaultOutputDevice), func(out []int32) {
 	    for i := range out {
