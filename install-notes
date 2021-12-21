@@ -1,21 +1,22 @@
+sudo apt-get install -y libasound2 libasound-dev libasound2-plugins alsa-utils alsa-oss
+sudo apt-get install pulseaudio pulseaudio-utils
+sudo apt install pavucontrol
+# Now you should be able to `pulseaudio --start` and see an output channel with `pacmd list-sinks` or `pavucontrol`
 sudo apt-get install -y pkg-config
-sudo apt-get install libasound-dev
+
+# Now download/install portaudio for the go library
 cd /usr/src
 sudo wget http://files.portaudio.com/archives/pa_stable_v190700_20210406.tgz
 sudo tar xvfz pa_stable_v190700_20210406.tgz
 cd portaudio
 sudo ./configure
-# Does ALSA say 'yes' in Configuration summary?
-sudo make
-# Now we can go get the portaudio go module
-(install pulseaudio)
-sudo apt-get install libasound2 libasound2-plugins alsa-utils alsa-oss
-sudo apt-get install pulseaudio pulseaudio-utils
-(add user to audio group?)
-sudo usermod -aG pulse,pulse-access fella
+# Hopefully ALSA says "yes" at the end of the configure summary
+sudo make && sudo make install
+sudo usermod -aG pulse,pulse-access <your_user>
 
-(run pulseaudio)
-pulseaudio --start
-
-(check for audio sinks)
-pacmd list-sinks
+# Now `go build` should work. It will first pull all of the go packages. Maybe it will complain about
+# pkg-config not finding portaudio-2.0, in which case you have to point some environment variable somewhere,
+# but that stopped happening to me the first time after installing portaudio.
+#
+# Also when bot runs it may vomit some weird ALSA errors and warnings but it doesn't stop it from runnning
+# and playing audio so I guess ignore that

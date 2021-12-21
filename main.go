@@ -37,7 +37,7 @@ func main() {
 
 	dg.AddHandler(handleMessage)
 
-	dg.Identify.Intents = discordgo.IntentsGuildMessages
+	dg.Identify.Intents = discordgo.IntentsGuilds | discordgo.IntentsGuildMessages | discordgo.IntentsGuildVoiceStates
 
 	err = dg.Open()
 	if err != nil {
@@ -45,7 +45,7 @@ func main() {
 		return
 	}
 
-	fmt.Printf("Bot runnin'.")
+	fmt.Printf("*~*~*~*~* Bot runnin'.\n\n")
 
     // we're gonna blast a welcome message to every channel we can
     for _, guild := range dg.State.Guilds {
@@ -67,7 +67,7 @@ func main() {
 
 	stream, err := portaudio.OpenStream(portaudio.HighLatencyParameters(nil, h.DefaultOutputDevice), func(out []int32) {
 	    for i := range out {
-	        out[i] = int32(rand.Uint32())
+	        out[i] = int32(rand.Uint32() / 10)
 	    }
 	})
 	if err != nil {
@@ -88,13 +88,14 @@ func main() {
 }
 
 func playSound(session *discordgo.Session, guildID, channelID string) {
-	fmt.Sprintf("Joined the voice channel...")
+	fmt.Printf("*~*~*~*~*  Entered playSound guildID=%v, channelID=%v.\n", guildID, channelID)
 	vc, err := session.ChannelVoiceJoin(guildID, channelID, false, true)
 	if err != nil {
-		panic("It all went wrong joining the voice channel.")
+		panic("@%@%@%@%@ It all went wrong joining the voice channel.\n")
 	}
 
 	time.Sleep(250 * time.Millisecond)
+	fmt.Printf("Joined! Now trying to speak...\n")
 
 	vc.Speaking(true)
 
@@ -115,14 +116,6 @@ func playSound(session *discordgo.Session, guildID, channelID string) {
 		}
 	}
 
-	/*
-	stream.Read()
-	for _, buff := range in {
-		vc.OpusSend <- buff
-		stream.Read()
-	}
-	*/
-
 	vc.Speaking(false)
 
 	time.Sleep(250 * time.Millisecond)
@@ -131,27 +124,32 @@ func playSound(session *discordgo.Session, guildID, channelID string) {
 }
 
 func handleMessage(session *discordgo.Session, msg *discordgo.MessageCreate) {
-	fmt.Sprintf("Entered handleMessage.")
+	fmt.Printf("*~*~*~*~*  Entered handleMessage.\n")
 	// Don't talk to yourself
 	if msg.Author.ID == session.State.User.ID {
 		return
 	}
 
-	fmt.Sprintf("Received '%v'")
+	fmt.Printf("msg.ChannelID: %v\n", msg.ChannelID)
+	fmt.Printf("msg.GuildID: %v\n", msg.GuildID)
+	for _, guild := range session.State.Guilds {
+		fmt.Printf("%v, ", guild.ID)
+	}
+	fmt.Println("end of guilds")
 
 	if msg.Content == "playsound" {
-		c, _ := session.State.Channel(msg.ChannelID)
-		g, _ := session.State.Guild(c.GuildID)
+		msgChannel, _ := session.State.Channel(msg.ChannelID)
+		msgGuild, _ := session.State.Guild(msgChannel.GuildID)
 
-		for _, vs := range g.VoiceStates {
-			if vs.UserID == msg.Author.ID {
-				playSound(session, g.ID, vs.ChannelID)
+		for _, voiceState := range msgGuild.VoiceStates {
+			if voiceState.UserID == msg.Author.ID {
+				playSound(session, msgGuild.ID, voiceState.ChannelID)
 			}
 		}
 	}
 
 	if msg.Content == "bing" {
-		fmt.Printf("%v: %v", msg.Author.Username, msg.Content)
+		fmt.Printf("%v: %v\n", msg.Author.Username, msg.Content)
 		session.ChannelMessageSend(msg.ChannelID, "bong")
 	}
 }
