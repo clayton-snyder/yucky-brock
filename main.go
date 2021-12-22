@@ -1,17 +1,20 @@
 package main
 
 import (
+//	"bytes"
+//	"encoding/binary"
 	"flag"
 	"fmt"
 	"os"
 	"os/signal"
-	"math/rand"
-    "math"
+//	"math/rand"
+//        "math"
 	"syscall"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/gordonklaus/portaudio"
+	"gopkg.in/hraban/opus.v2"
 )
 
 var (
@@ -26,7 +29,7 @@ func init() {
 
 	fmt.Printf("Flags: DiscordToken=%v, GreetingMsg=%v\n", DiscordToken, GreetingMsg)
 }
-
+/*
 type stereoSine struct {
     *portaudio.Stream
     stepL, phaseL float64
@@ -47,6 +50,7 @@ func (g *stereoSine) processAudio(out [][]float32) {
         _, g.phaseR = math.Modf(g.phaseR + g.stepR)
     }
 }
+*/
 
 func main() {
 	// Create Discord session with token from flag
@@ -81,18 +85,18 @@ func main() {
 
 	portaudio.Initialize()
 	defer portaudio.Terminate()
+	/*
 	h, err := portaudio.DefaultHostApi()
 	if err != nil {
 	    fmt.Printf("Error with portaudio.DefaultHostApi(): '%v'\n", err)
 	    return
-	}
+	}*/
 
-    s := newStereoSine(256, 320, 44100)
-    defer s.Close()
-    s.Start()
-    time.Sleep (5 * time.Second)
-    s.Stop()
-
+//    s := newStereoSine(256, 320, 44100)
+//    defer s.Close()
+//    s.Start()
+    time.Sleep (time.Second)
+/*
 	stream, err := portaudio.OpenStream(portaudio.HighLatencyParameters(nil, h.DefaultOutputDevice), func(out []int32) {
 	    for i := range out {
 	        out[i] = int32(rand.Uint32() / 10)
@@ -102,16 +106,19 @@ func main() {
 	    fmt.Printf("Error with portaudio.OpenStream(): '%v'\n", err)
 	    return
 	}
+	
 
 	defer stream.Close()
 	stream.Start()
+	*/
 	time.Sleep(time.Second)
 
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM, os.Interrupt, os.Kill)
 	<-sig
 
-	stream.Stop()
+//	s.Stop()
+//	stream.Stop()
 	dg.Close()
 }
 
@@ -127,16 +134,47 @@ func playSound(session *discordgo.Session, guildID, channelID string) {
 
 	vc.Speaking(true)
 
-	in := make([]byte, 64)
-	stream, err := portaudio.OpenDefaultStream(1, 0, 44100, len(in), in)
+	// Input buffer for raw PCM audio data. Note that length*1000/sampleRate must be 2.5, 5, 10, 20, 40, or 60 (it's ms that the frame represents)
+	// see hraban/opus.v2 "encoding" for more info
+	in := make([]int16, 960)
+	/*
+	testBytes := make([]byte, 64)
+	for x := range testBytes {
+		testBytes[x] = byte(50)
+	}
+	*/
+
+	// Have to encode raw audio with this before sending to Discord
+	enc, err := opus.NewEncoder(48000, 1, opus.AppVoIP)
+	if err != nil {
+		fmt.Printf("Error creating Opus encoder: %v\n", err)
+	}
+
+	// This is the default output of our machine, so spotifyd should stream through here
+	stream, err := portaudio.OpenDefaultStream(1, 0, 48000, len(in), in)
 	defer stream.Close()
 	stream.Start()
+
+	// Remove these, unnecessary?
 	sign := make(chan os.Signal, 1)
         signal.Notify(sign, syscall.SIGINT, syscall.SIGTERM, os.Interrupt, os.Kill)
 
 	for {
 		stream.Read()
-		vc.OpusSend <- in
+		data := make([]byte, 1000)
+		n, encerr := enc.Encode(in, data)
+		if encerr != nil {
+			fmt.Printf("Error with enc.Encode(): %v", encerr)
+			return
+		}
+		data = data[:n] // Only the first 'n' bytes are opus data.
+/*		inBytesBuf := new(bytes.Buffer)
+		err := binary.Write(inBytesBuf, binary.LittleEndian, in)
+		if err != nil {
+			fmt.Printf("binary.Write failed: %v", err)
+		}
+		*/
+		vc.OpusSend <- data
 		select {
 			case <-sign:
 				return

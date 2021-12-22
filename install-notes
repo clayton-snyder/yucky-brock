@@ -12,11 +12,24 @@ cd portaudio
 sudo ./configure
 # Hopefully ALSA says "yes" at the end of the configure summary
 sudo make && sudo make install
+
+# probably not necessary
 sudo usermod -aG pulse,pulse-access <your_user>
+
+# Install opus for encoding raw PCM audio stream to send to Discord
+ # NOT NECESSARY? sudo wget https://archive.mozilla.org/pub/opus/opus-1.3.1.tar.gz
+ # NOT NECESSARY? sudo tar xvf opus-1.3.1.tar.gz && cd opus-1.3.1
+ # NOT NECESSARY? sudo ./ configure --prefix=/usr --disable-static --docdir=/usr/share/doc/opus-1.3.1 && sudo make
+ # NOT NECESSARY? sudo make install
+
+# Above installing from source not necessary (maybe...), just try this first, if not, do all the NOT NECESSARY? steps above
+sudo apt install libopus-dev libopus0 opus-tools libopusfile-dev
 
 # Now `go build` should work. It will first pull all of the go packages. Maybe it will complain about
 # pkg-config not finding portaudio-2.0, in which case you have to point some environment variable somewhere,
 # but that stopped happening to me the first time after installing portaudio.
+#
+# If it complains to you about having to `go get` something just do it, but I think go build does it for you now.
 #
 # Also when bot runs it may vomit some weird ALSA errors and warnings but it doesn't stop it from runnning
 # and playing audio so I guess ignore that
