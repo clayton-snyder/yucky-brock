@@ -33,3 +33,12 @@ sudo apt install libopus-dev libopus0 opus-tools libopusfile-dev
 #
 # Also when bot runs it may vomit some weird ALSA errors and warnings but it doesn't stop it from runnning
 # and playing audio so I guess ignore that
+
+
+# install spotifyd, just follow https://spotifyd.github.io/spotifyd/installation/Ubuntu.html
+# takes a long Ass time
+# Check out the configuration page on those docs to set up the config file correctly
+#
+#
+# SPOTIFY API
+# user-read-playback-state user-modify-playback-state 
