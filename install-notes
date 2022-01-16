@@ -42,3 +42,4 @@ sudo apt install libopus-dev libopus0 opus-tools libopusfile-dev
 #
 # SPOTIFY API
 # user-read-playback-state user-modify-playback-state 
+# And you need to set SPOTIFY_ID and SPOTIFY_SECRET env vars to the Spotify app stoiff

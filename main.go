@@ -1,58 +1,82 @@
 package main
 
 import (
-//	"bytes"
-//	"encoding/binary"
+	//	"bytes"
+	//	"encoding/binary"
+	"context"
 	"flag"
 	"fmt"
+	"strings"
+
+	"net/http"
 	"os"
 	"os/signal"
-//	"math/rand"
-//        "math"
+
+	//        "math"
 	"syscall"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/gordonklaus/portaudio"
+
+	"github.com/zmb3/spotify/v2"
+	spotifyauth "github.com/zmb3/spotify/v2/auth"
 	"gopkg.in/hraban/opus.v2"
 )
 
+const redirectURI = "http://localhost:8080/brocktch"
+
 var (
-	DiscordToken string
-	GreetingMsg  string
+	DiscordToken        string
+	GreetingMsg         string
+	auth                *spotifyauth.Authenticator
+	client              *spotify.Client
+	SpotifyClientID     = "36d55d262e3644c6bf21f3788850c290"
+	SpotifyClientSecret = "8565b988091a47f5a8afecb99617e097"
+	spotifyCh           = make(chan *spotify.Client)
+	state               = "2323cs"
 )
 
 func init() {
 	flag.StringVar(&DiscordToken, "t", "", "")
 	flag.StringVar(&GreetingMsg, "m", "I believe in rock-hard defense and determination!", "")
 	flag.Parse()
+	Tonst()
 
 	fmt.Printf("Flags: DiscordToken=%v, GreetingMsg=%v\n", DiscordToken, GreetingMsg)
-}
-/*
-type stereoSine struct {
-    *portaudio.Stream
-    stepL, phaseL float64
-    stepR, phaseR float64
-}
 
-func newStereoSine(freqL, freqR, sampleRate float64) *stereoSine {
-    s := &stereoSine{nil, freqL / sampleRate, 0, freqR / sampleRate, 0}
-    s.Stream, _ = portaudio.OpenDefaultStream(0, 2, 44100, 0, s.processAudio)
-    return s
-}
+	os.Setenv("SPOTIFY_ID", SpotifyClientID)
+	os.Setenv("SPOTIFY_SECRET", SpotifyClientSecret)
 
-func (g *stereoSine) processAudio(out [][]float32) {
-    for i := range out[0] {
-        out[0][i] = float32(math.Sin(2 * math.Pi * g.phaseL))
-        _, g.phaseL = math.Modf(g.phaseL + g.stepL)
-        out[1][i] = float32(math.Sin(2 * math.Pi * g.phaseR))
-        _, g.phaseR = math.Modf(g.phaseR + g.stepR)
-    }
+	auth = spotifyauth.New(spotifyauth.WithRedirectURL(redirectURI), spotifyauth.WithScopes(spotifyauth.ScopeUserReadPrivate, spotifyauth.ScopeUserModifyPlaybackState))
+
+	// This will receive the Spotify callback with the token
+	http.HandleFunc("/brocktch", doAuth)
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Printf("Not handling request for: %v", r.URL.String())
+	})
+
+	// we have to listen on a separate thread so rest of program can run 8^)
+	go func() {
+		err := http.ListenAndServe(":8080", nil)
+		if err != nil {
+			fmt.Printf("Error listening on 8080: %v", err)
+		}
+	}()
+	fmt.Println("Listening on 8080.")
+
+	url := auth.AuthURL(state)
+	fmt.Printf("Log in to a Premium account here: %v \n", url)
+	client = <-spotifyCh
 }
-*/
 
 func main() {
+	user, err := client.CurrentUser(context.Background())
+	// queueErr := client.QueueSong(context.Background(), "1goNp8FZSjak6UHYsawniU")
+	// playErr := client.Play(context.Background())
+
+	fmt.Printf("Logged in as %v (%v)\n", user.ID, user.User.DisplayName)
+
 	// Create Discord session with token from flag
 	dg, err := discordgo.New("Bot " + DiscordToken)
 
@@ -73,52 +97,48 @@ func main() {
 
 	fmt.Printf("*~*~*~*~* Bot runnin'.\n\n")
 
-    // we're gonna blast a welcome message to every channel we can
-    for _, guild := range dg.State.Guilds {
-        channels, _ := dg.GuildChannels(guild.ID)
-        for _, channel := range channels {
-            if channel.Type == discordgo.ChannelTypeGuildText {
-                dg.ChannelMessageSend(channel.ID, GreetingMsg)
-            }
-        }
-    }
+	// we're gonna blast a welcome message to every channel we can
+	for _, guild := range dg.State.Guilds {
+		channels, _ := dg.GuildChannels(guild.ID)
+		for _, channel := range channels {
+			if channel.Type == discordgo.ChannelTypeGuildText {
+				dg.ChannelMessageSend(channel.ID, GreetingMsg)
+			}
+		}
+	}
 
 	portaudio.Initialize()
 	defer portaudio.Terminate()
-	/*
-	h, err := portaudio.DefaultHostApi()
-	if err != nil {
-	    fmt.Printf("Error with portaudio.DefaultHostApi(): '%v'\n", err)
-	    return
-	}*/
 
-//    s := newStereoSine(256, 320, 44100)
-//    defer s.Close()
-//    s.Start()
-    time.Sleep (time.Second)
-/*
-	stream, err := portaudio.OpenStream(portaudio.HighLatencyParameters(nil, h.DefaultOutputDevice), func(out []int32) {
-	    for i := range out {
-	        out[i] = int32(rand.Uint32() / 10)
-	    }
-	})
-	if err != nil {
-	    fmt.Printf("Error with portaudio.OpenStream(): '%v'\n", err)
-	    return
-	}
-	
+	// h, err := portaudio.DefaultHostApi()
+	// if err != nil {
+	// 	fmt.Printf("Error with portaudio.DefaultHostApi(): '%v'\n", err)
+	// 	return
+	// }
 
-	defer stream.Close()
-	stream.Start()
-	*/
+	// time.Sleep(time.Second)
+
+	// stream, err := portaudio.OpenStream(portaudio.HighLatencyParameters(nil, h.DefaultOutputDevice), func(out []int32) {
+	// 	for i := range out {
+	// 		out[i] = int32(rand.Uint32() / 10)
+	// 	}
+	// })
+	// if err != nil {
+	// 	fmt.Printf("Error with portaudio.OpenStream(): '%v'\n", err)
+	// 	return
+	// }
+
+	// defer stream.Close()
+	// stream.Start()
+
 	time.Sleep(time.Second)
 
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM, os.Interrupt, os.Kill)
 	<-sig
 
-//	s.Stop()
-//	stream.Stop()
+	//	s.Stop()
+	//	stream.Stop()
 	dg.Close()
 }
 
@@ -138,10 +158,10 @@ func playSound(session *discordgo.Session, guildID, channelID string) {
 	// see hraban/opus.v2 "encoding" for more info
 	in := make([]int16, 960)
 	/*
-	testBytes := make([]byte, 64)
-	for x := range testBytes {
-		testBytes[x] = byte(50)
-	}
+		testBytes := make([]byte, 64)
+		for x := range testBytes {
+			testBytes[x] = byte(50)
+		}
 	*/
 
 	// Have to encode raw audio with this before sending to Discord
@@ -151,13 +171,15 @@ func playSound(session *discordgo.Session, guildID, channelID string) {
 	}
 
 	// This is the default output of our machine, so spotifyd should stream through here
+	fmt.Println("*~~~~~~~~~~~~~~~~~~~*~~~~~~~~~~~~~~~~~~~~~~~~~* OPENING THE DAMN DEFAULT STREAM GUY")
 	stream, err := portaudio.OpenDefaultStream(1, 0, 48000, len(in), in)
+
 	defer stream.Close()
 	stream.Start()
 
 	// Remove these, unnecessary?
 	sign := make(chan os.Signal, 1)
-        signal.Notify(sign, syscall.SIGINT, syscall.SIGTERM, os.Interrupt, os.Kill)
+	signal.Notify(sign, syscall.SIGINT, syscall.SIGTERM, os.Interrupt, os.Kill)
 
 	for {
 		stream.Read()
@@ -168,17 +190,17 @@ func playSound(session *discordgo.Session, guildID, channelID string) {
 			return
 		}
 		data = data[:n] // Only the first 'n' bytes are opus data.
-/*		inBytesBuf := new(bytes.Buffer)
-		err := binary.Write(inBytesBuf, binary.LittleEndian, in)
-		if err != nil {
-			fmt.Printf("binary.Write failed: %v", err)
-		}
+		/*		inBytesBuf := new(bytes.Buffer)
+				err := binary.Write(inBytesBuf, binary.LittleEndian, in)
+				if err != nil {
+					fmt.Printf("binary.Write failed: %v", err)
+				}
 		*/
 		vc.OpusSend <- data
 		select {
-			case <-sign:
-				return
-			default:
+		case <-sign:
+			return
+		default:
 		}
 	}
 
@@ -196,14 +218,9 @@ func handleMessage(session *discordgo.Session, msg *discordgo.MessageCreate) {
 		return
 	}
 
-	fmt.Printf("msg.ChannelID: %v\n", msg.ChannelID)
-	fmt.Printf("msg.GuildID: %v\n", msg.GuildID)
-	for _, guild := range session.State.Guilds {
-		fmt.Printf("%v, ", guild.ID)
-	}
-	fmt.Println("end of guilds")
+	cleanMsg := strings.ToLower(strings.Trim(msg.Content, " "))
 
-	if msg.Content == "playsound" {
+	if cleanMsg == "playsound" {
 		msgChannel, _ := session.State.Channel(msg.ChannelID)
 		msgGuild, _ := session.State.Guild(msgChannel.GuildID)
 
@@ -214,8 +231,63 @@ func handleMessage(session *discordgo.Session, msg *discordgo.MessageCreate) {
 		}
 	}
 
-	if msg.Content == "bing" {
+	if cleanMsg == "bing" {
 		fmt.Printf("%v: %v\n", msg.Author.Username, msg.Content)
 		session.ChannelMessageSend(msg.ChannelID, "bong")
 	}
+
+	if strings.HasPrefix(cleanMsg, "queue ") {
+		tokens := strings.SplitN(msg.Content, " ", 2)
+		if len(tokens) < 2 {
+			session.ChannelMessageSend(msg.ChannelID, "Queue what?")
+			return
+		}
+
+		track, searchErr := search(client, tokens[1])
+		if searchErr != nil {
+			session.ChannelMessageSend(msg.ChannelID, searchErr.Error())
+			return
+		}
+
+		queueErr := queue(client, track.ID)
+		if queueErr != nil {
+			session.ChannelMessageSend(msg.ChannelID, queueErr.Error())
+			return
+		}
+
+		session.ChannelMessageSend(
+			msg.ChannelID,
+			fmt.Sprintf("Added %v by %v to the queue.", track.Name, track.Artists))
+	}
+
+	if cleanMsg == "play" {
+		client.Play(context.Background())
+	}
+
+	if cleanMsg == "stop" || cleanMsg == "pause" {
+		client.Pause(context.Background())
+	}
+
+	if cleanMsg == "next" || cleanMsg == "skip" {
+		client.Next(context.Background())
+	}
+
+}
+
+func doAuth(w http.ResponseWriter, r *http.Request) {
+	token, err := auth.Token(r.Context(), state, r)
+	if err != nil {
+		http.Error(w, "Couldn't get token", http.StatusForbidden)
+		fmt.Printf("Error getting token: %v\n", err)
+	}
+
+	if st := r.FormValue("state"); st != state {
+		http.NotFound(w, r)
+		fmt.Printf("State mismatch: st=%v, state=%v\n", st, state)
+	}
+	fmt.Printf("State and st match! %v\n", state)
+
+	client := spotify.New(auth.Client(r.Context(), token))
+	fmt.Println("Login completed.")
+	spotifyCh <- client
 }
