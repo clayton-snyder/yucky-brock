@@ -1,0 +1,12 @@
+SMALL
+-Handle 0 search results (currently it crashes because it looks at first index no matter what)
+-Tune audio parameters. Look at opus.v2 package and examples to understand what the parameters do and experiment with which combo sounds good. Currently it drops a lot of audio (I think the buffer size is too large, this might in fact be very easy)
+
+MEDIUM
+-"Help" command to display and describe commands
+-"Queue" command currently takes the search term and queues whatever the top result is. Would be good to have a "search" command that takes the search term and /just/ returns the top 5 or so results along with artist/album and trackID, then have a "queue by ID" mode that you can paste the ID in and it will attempt to queue that exact ID. Basically to avoid situations where you search for a track and the first result is some remix or something (happens often)
+-Might be nice to have the bot only listen to one channel that is designated for Brock commands so we don't clog up general with commands and responses. This is easy, just set up the channel and then in main() after Brock has established the discord session, loop through all of the channels in the guild and pick out the one titled "brock-place" or whatever the channel is named, then save the ChannelID. Then in the message handler function, just ignore any message that didn't come from that channel ID. 
+
+LARGE
+-Deploy to its forever home
+-Instead of queuing songs, investigate using a playlist. Two problems with queueing: 1: can't display upcoming songs (yes really), and 2: it will autoplay suggested tracks/artists after the queue is empty (can't turn this off - what the fuck). Maybe maintaining a playlist would solve these, but we'd have to figure out how to remove a song from the playlist once it's played.

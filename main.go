@@ -31,8 +31,8 @@ var (
 	GreetingMsg         string
 	auth                *spotifyauth.Authenticator
 	client              *spotify.Client
-	SpotifyClientID     = "36d55d262e3644c6bf21f3788850c290"
-	SpotifyClientSecret = "8565b988091a47f5a8afecb99617e097"
+	SpotifyClientID     = "e1fae77fde6b40e68f7a27cba74282d5"
+	SpotifyClientSecret = "2c3261eafaa24a9a9ebe5d34c9fa3b81"
 	spotifyCh           = make(chan *spotify.Client)
 	state               = "2323cs"
 )
@@ -71,9 +71,17 @@ func init() {
 }
 
 func main() {
-	user, err := client.CurrentUser(context.Background())
+	user, spotifyAuthErr := client.CurrentUser(context.Background())
 	// queueErr := client.QueueSong(context.Background(), "1goNp8FZSjak6UHYsawniU")
 	// playErr := client.Play(context.Background())
+
+	if spotifyAuthErr != nil {
+		fmt.Printf("Error logging into Spotify: %v\n", spotifyAuthErr)
+		return
+	} else if user == nil {
+		fmt.Printf("No spotifyAuthErr, but 'user' is nil.\n")
+		return
+	}
 
 	fmt.Printf("Logged in as %v (%v)\n", user.ID, user.User.DisplayName)
 
@@ -285,7 +293,6 @@ func doAuth(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		fmt.Printf("State mismatch: st=%v, state=%v\n", st, state)
 	}
-	fmt.Printf("State and st match! %v\n", state)
 
 	client := spotify.New(auth.Client(r.Context(), token))
 	fmt.Println("Login completed.")
