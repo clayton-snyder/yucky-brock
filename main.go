@@ -31,9 +31,12 @@ var (
 	GreetingMsg         string
 	auth                *spotifyauth.Authenticator
 	client              *spotify.Client
+	BrockChannelID      string
+	BrockChannelName    = "brock-talk"
 	SpotifyClientID     = "e1fae77fde6b40e68f7a27cba74282d5"
 	SpotifyClientSecret = "2c3261eafaa24a9a9ebe5d34c9fa3b81"
 	spotifyCh           = make(chan *spotify.Client)
+	leaveVC             = make(chan int)
 	state               = "2323cs"
 )
 
@@ -109,8 +112,10 @@ func main() {
 	for _, guild := range dg.State.Guilds {
 		channels, _ := dg.GuildChannels(guild.ID)
 		for _, channel := range channels {
-			if channel.Type == discordgo.ChannelTypeGuildText {
+			if strings.ToLower(channel.Name) == BrockChannelName {
+				BrockChannelID = channel.ID
 				dg.ChannelMessageSend(channel.ID, GreetingMsg)
+				break
 			}
 		}
 	}
@@ -153,6 +158,7 @@ func main() {
 func playSound(session *discordgo.Session, guildID, channelID string) {
 	fmt.Printf("*~*~*~*~*  Entered playSound guildID=%v, channelID=%v.\n", guildID, channelID)
 	vc, err := session.ChannelVoiceJoin(guildID, channelID, false, true)
+
 	if err != nil {
 		panic("@%@%@%@%@ It all went wrong joining the voice channel.\n")
 	}
@@ -186,10 +192,10 @@ func playSound(session *discordgo.Session, guildID, channelID string) {
 	stream.Start()
 
 	// Remove these, unnecessary?
-	sign := make(chan os.Signal, 1)
-	signal.Notify(sign, syscall.SIGINT, syscall.SIGTERM, os.Interrupt, os.Kill)
+	// signal.Notify(sign, syscall.SIGINT, syscall.SIGTERM, os.Interrupt, os.Kill)
 
-	for {
+	leaveVoice := false
+	for !leaveVoice {
 		stream.Read()
 		data := make([]byte, 1000)
 		n, encerr := enc.Encode(in, data)
@@ -206,8 +212,8 @@ func playSound(session *discordgo.Session, guildID, channelID string) {
 		*/
 		vc.OpusSend <- data
 		select {
-		case <-sign:
-			return
+		case <-leaveVC:
+			leaveVoice = true
 		default:
 		}
 	}
@@ -221,14 +227,14 @@ func playSound(session *discordgo.Session, guildID, channelID string) {
 
 func handleMessage(session *discordgo.Session, msg *discordgo.MessageCreate) {
 	fmt.Printf("*~*~*~*~*  Entered handleMessage.\n")
-	// Don't talk to yourself
-	if msg.Author.ID == session.State.User.ID {
+	// Only listen to #brock-talk and don't talk to yourself
+	if msg.ChannelID != BrockChannelID || msg.Author.ID == session.State.User.ID {
 		return
 	}
 
 	cleanMsg := strings.ToLower(strings.Trim(msg.Content, " "))
 
-	if cleanMsg == "playsound" {
+	if cleanMsg == "join me brock" || cleanMsg == "join us brock" || cleanMsg == "join me, brock" || cleanMsg == "join us, brock" {
 		msgChannel, _ := session.State.Channel(msg.ChannelID)
 		msgGuild, _ := session.State.Guild(msgChannel.GuildID)
 
@@ -242,6 +248,10 @@ func handleMessage(session *discordgo.Session, msg *discordgo.MessageCreate) {
 	if cleanMsg == "bing" {
 		fmt.Printf("%v: %v\n", msg.Author.Username, msg.Content)
 		session.ChannelMessageSend(msg.ChannelID, "bong")
+	}
+
+	if msg.Content == "That's all for now Brock, thank you!" {
+		leaveVC <- 1
 	}
 
 	if strings.HasPrefix(cleanMsg, "queue ") {
