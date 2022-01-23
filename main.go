@@ -170,34 +170,35 @@ func playSound(session *discordgo.Session, guildID, channelID string) {
 
 	// Input buffer for raw PCM audio data. Note that length*1000/sampleRate must be 2.5, 5, 10, 20, 40, or 60 (it's ms that the frame represents)
 	// see hraban/opus.v2 "encoding" for more info
-	in := make([]int16, 960)
-	/*
-		testBytes := make([]byte, 64)
-		for x := range testBytes {
-			testBytes[x] = byte(50)
-		}
-	*/
+	// 960 * 1000 / 48000 = 20ms
+	bufferLength := 960
+	sampleRate := 48000
+	in := make([]int16, bufferLength)
 
 	// Have to encode raw audio with this before sending to Discord
-	enc, err := opus.NewEncoder(48000, 1, opus.AppVoIP)
+	enc, err := opus.NewEncoder(sampleRate, 1, opus.AppAudio)
 	if err != nil {
 		fmt.Printf("Error creating Opus encoder: %v\n", err)
 	}
 
-	// This is the default output of our machine, so spotifyd should stream through here
+	// This is the default output of our machine, so spotify should stream through here
 	fmt.Println("*~~~~~~~~~~~~~~~~~~~*~~~~~~~~~~~~~~~~~~~~~~~~~* OPENING THE DAMN DEFAULT STREAM GUY")
-	stream, err := portaudio.OpenDefaultStream(1, 0, 48000, len(in), in)
+	stream, err := portaudio.OpenDefaultStream(1, 0, float64(sampleRate), len(in), in)
+
+	if err != nil {
+		fmt.Println("Error with portaudio.OpenDefaultStream(): " + err.Error())
+		vc.Speaking(false)
+		time.Sleep(250 * time.Millisecond)
+		vc.Disconnect()
+	}
 
 	defer stream.Close()
 	stream.Start()
 
-	// Remove these, unnecessary?
-	// signal.Notify(sign, syscall.SIGINT, syscall.SIGTERM, os.Interrupt, os.Kill)
-
 	leaveVoice := false
 	for !leaveVoice {
 		stream.Read()
-		data := make([]byte, 1000)
+		data := make([]byte, bufferLength) // have to make this every time since it gets truncated
 		n, encerr := enc.Encode(in, data)
 		if encerr != nil {
 			fmt.Printf("Error with enc.Encode(): %v", encerr)
@@ -250,7 +251,7 @@ func handleMessage(session *discordgo.Session, msg *discordgo.MessageCreate) {
 		session.ChannelMessageSend(msg.ChannelID, "bong")
 	}
 
-	if msg.Content == "That's all for now Brock, thank you!" {
+	if msg.Content == "That's all for now Brock, thank you." {
 		leaveVC <- 1
 	}
 
